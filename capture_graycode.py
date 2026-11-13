@@ -17,6 +17,7 @@ def main():
                         help='number used in the output folder (capture_<number>)')
     parser.add_argument('--camera-index', type=int, default=0,
                         help='OpenCV camera index (default: 0)')
+    parser.add_argument('--auto', action='store_true', help='Do capture automatically without waiting for user input')
     args = parser.parse_args()
 
     if args.capture_number < 0:
@@ -63,13 +64,16 @@ def main():
             cv2.imshow(window_name, pattern)
             print(f'Pattern {sequence_number}/{len(patterns)}: {pattern_path}')
 
-            while True:
-                key = cv2.waitKey(0) & 0xFF
-                if key in (27, ord('q')):
-                    print('Capture stopped.')
-                    return 0
-                if key in (32, 13):
-                    break
+            if args.auto:
+                cv2.waitKey(500)  # Wait before capturing automatically
+            else:
+                while True:
+                    key = cv2.waitKey(0) & 0xFF
+                    if key in (27, ord('q')):
+                        print('Capture stopped.')
+                        return 0
+                    if key in (32, 13):
+                        break
 
             ok, frame = camera.read()
             if not ok:

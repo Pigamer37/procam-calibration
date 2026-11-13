@@ -1,0 +1,8 @@
+//gen graycode
+python3 gen_graycode_imgs.py 1080 1920
+
+//Take captures
+python3 capture_graycode.py ./graycode_pattern <number> --camera-index 2 --auto
+
+//calibrate 231 mm
+python3 calibrate.py 1080 1920 10 7 23.1 1
