@@ -40,16 +40,17 @@ def main():
     parser.add_argument('-white_thr', type=int, default=5,
                         help='threashold to specify robustness of graycode decoding (default : 5)')
     parser.add_argument('-camera', type=str, default=str(),help='camera internal parameter json file')
+    parser.add_argument('--cornerSubPix', action='store_true', default=False, help='Estimate camera corner detections with subpixel accuracy (default: False)')
 
     args = parser.parse_args()
 
-    proj_shape = (args.proj_height, args.proj_width)
+    proj_shape = (args.proj_width, args.proj_height)
     chess_shape = (args.chess_vert, args.chess_hori)
     chess_block_size = args.chess_block_size
     gc_step = args.graycode_step
     black_thr = args.black_thr
     white_thr = args.white_thr
-
+    corner_subpix = args.cornerSubPix
     camera_param_file = args.camera
 
     dirnames = sorted(glob.glob('./capture_*'))
@@ -79,7 +80,7 @@ def main():
 
     calibrate(used_dirnames, gc_fname_lists,
               proj_shape, chess_shape, chess_block_size, gc_step, black_thr, white_thr,
-               camP, cam_dist)
+               camP, cam_dist, corner_subpix)
 
 
 def printNumpyWithIndent(tar, indentchar):
@@ -92,14 +93,16 @@ def loadCameraParam(json_file):
         d = param_data['camera']['distortion']
         return np.array(P).reshape([3,3]), np.array(d)
 
-def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_size, gc_step, black_thr, white_thr, camP, camD):
+def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_size, gc_step, black_thr, white_thr, camP, camD, corner_subpix=False):
     objps = np.zeros((chess_shape[0]*chess_shape[1], 3), np.float32)
     objps[:, :2] = chess_block_size * \
         np.mgrid[0:chess_shape[0], 0:chess_shape[1]].T.reshape(-1, 2)
 
     print('Calibrating ...')
-    gc_height = int((proj_shape[0]-1)/gc_step)+1
-    gc_width = int((proj_shape[1]-1)/gc_step)+1
+    proj_width, proj_height = proj_shape
+
+    gc_width  = int((proj_width  - 1) / gc_step) + 1
+    gc_height = int((proj_height - 1) / gc_step) + 1
     graycode = cv2.structured_light_GrayCodePattern.create(
         gc_width, gc_height)
     graycode.setBlackThreshold(black_thr)
@@ -135,6 +138,13 @@ def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_siz
             print('Error : chessboard was not found in \'' +
                   gc_filenames[-2] + '\'')
             return None
+        
+        if corner_subpix:
+            criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 40, 0.001)
+            cam_corners = cv2.cornerSubPix(white_img, cam_corners, (11, 11), (-1, -1), criteria=criteria)
+
+        cam_corners = cam_corners.reshape(-1, 1, 2)
+
         cam_objps_list.append(objps)
         cam_corners_list.append(cam_corners)
 
@@ -185,11 +195,13 @@ def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_siz
     print('Initial solution of camera\'s intrinsic parameters')
     cam_rvecs = []
     cam_tvecs = []
+    flags = None
     if(camP is None):
         ret, cam_int, cam_dist, cam_rvecs, cam_tvecs = cv2.calibrateCamera(
             cam_objps_list, cam_corners_list, cam_shape, None, None, None, None)
         print('  RMS :', ret)
     else:
+        flags = cv2.CALIB_FIX_INTRINSIC
         for objp, corners in zip(cam_objps_list, cam_corners_list):
             ret, cam_rvec, cam_tvec = cv2.solvePnP(objp, corners, camP, camD) 
             cam_rvecs.append(cam_rvec)
@@ -215,7 +227,7 @@ def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_siz
 
     print('=== Result ===')
     ret, cam_int, cam_dist, proj_int, proj_dist, cam_proj_rmat, cam_proj_tvec, E, F = cv2.stereoCalibrate(
-        proj_objps_list, cam_corners_list2, proj_corners_list, cam_int, cam_dist, proj_int, proj_dist, None)
+        proj_objps_list, cam_corners_list2, proj_corners_list, cam_int, cam_dist, proj_int, proj_dist, None, flags=flags)
     print('  RMS :', ret)
     print('  Camera intrinsic parameters :')
     printNumpyWithIndent(cam_int, '    ')
