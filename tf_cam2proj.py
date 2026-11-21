@@ -7,17 +7,57 @@ def main():
   parser = argparse.ArgumentParser(description='Get projector image coordinates from camera image coordinates and depth values')
   parser.add_argument('cam_x', type=int, help='camera pixel x coordinate')
   parser.add_argument('cam_y', type=int, help='camera pixel y coordinate')
-  parser.add_argument('cam_depth', type=float, help='depth value at camera pixel (must have the same units as the T vector)')
+  parser.add_argument('--cam_depth', type=float, help='depth value at camera pixel (must have the same units as the T vector)')
   parser.add_argument('--camera-index', type=int, default=0,
                           help='OpenCV camera index (default: 0)')
-  parser.add_argument('-c', '--calibration', type=str, default=str(), help='camera internal parameter json file')
+  parser.add_argument('calibration', type=str, default=str(), help='camera internal parameter json file')
   parser.add_argument('--proj2cam', action='store_true', default=False, help='Invert the extrinsic transformation to get camera coordinates from projector coordinates')
 
   args = parser.parse_args()
   
   cam_x = args.cam_x
   cam_y = args.cam_y
-  cam_depth = args.cam_depth
+
+  # camera = cv2.VideoCapture(args.camera_index)
+  # if not camera.isOpened():
+  #     camera.release()
+  #     parser.error(f'could not open camera index {args.camera_index}')
+  #
+  # camera.set(cv2.CAP_PROP_BUFFERSIZE, 1) #no repeated frames
+  # ok, frame = camera.read()
+  # if not ok:
+  #   print('Could not read a frame from the camera.')
+  #   return 1
+  # Match the exact resolution used during your calibration
+  first_img = sorted(glob.glob('./capture_*'))[0] + '/graycode_00.png'
+  frame = cv2.imread(first_img, cv2.IMREAD_COLOR)
+  if frame is None:
+    raise ValueError("Could not read image to determine camera resolution")
+  
+  print("Cam resolution is", frame.shape[0], frame.shape[1])
+
+  auto_depth = False
+  if args.cam_depth is not None:
+    cam_depth = args.cam_depth
+  else:
+    print("Trying to obtain depth automatically trough Realsense camera...")
+    try:
+      import depth
+    except ImportError:
+      print("Could not import depth utils!")
+      exit(1)
+
+    pipeline, align, config = depth.configureDepthCam(frame.shape[1], frame.shape[0], 30)
+    auto_depth = True
+    if auto_depth:
+      profile = pipeline.start(config)
+
+    cam_depth = depth.getDepth(cam_x, cam_y, pipeline, align)
+    if cam_depth is None:
+      print("Error obtaining depth through camera")
+      exit(1)
+
+    print(f"Obtained depth: {cam_depth}m")
 
   print("Reading calibration...")
 
@@ -76,7 +116,7 @@ def main():
 
   proj_x, proj_y = cam2proj(cam_x, cam_y, cam_depth, R, T, K_cam, D_cam, K_proj, D_proj)
   print(f'Camera pixel ({cam_x}, {cam_y}) with depth {cam_depth} maps to projector pixel ({proj_x}, {proj_y})')
-  print(f"Inside frame: {0 <= proj_x < 1920 and 0 <= proj_y < 1080}")
+  print(f"Inside projector's projection plane?: {0 <= proj_x < 1920 and 0 <= proj_y < 1080}")
   
   # Draw target on camera feed for visual feedback
   # camera = cv2.VideoCapture(args.camera_index)
@@ -85,16 +125,6 @@ def main():
   #   parser.error(f'could not open camera index {args.camera_index}')
 
   try:
-    # ok, frame = camera.read()
-    # if not ok:
-    #     print('Could not read a frame from the camera.', file=sys.stderr)
-    #     return 1
-    first_img = sorted(glob.glob('./capture_*'))[0] + '/graycode_00.png'
-    frame = cv2.imread(first_img, cv2.IMREAD_COLOR)
-    #frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
-      
-    print("Cam resolution is", frame.shape[0], frame.shape[1])
-    
     mapped_proj_x = round(proj_x/1920*frame.shape[1])
     mapped_proj_y = round(proj_y/1080*frame.shape[0])
 
@@ -102,7 +132,7 @@ def main():
     cv2.circle(frame, (mapped_proj_x, mapped_proj_y), 5, (0, 0, 255), -1)
 
     cv2.namedWindow("Camera", cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty("Camera", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    # cv2.setWindowProperty("Camera", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     cv2.imshow("Camera", frame)
     while True:
       key = cv2.waitKey(0) & 0xFF
@@ -115,7 +145,9 @@ def main():
   finally:
     # if camera is not None:
     #   camera.release()
-    
+    if auto_depth:
+      pipeline.stop()
+
     cv2.destroyAllWindows()
 
 def printNumpyWithIndent(tar, indentchar):

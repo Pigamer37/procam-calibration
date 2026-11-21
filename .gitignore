@@ -1,4 +1,5 @@
 .vscode
-.venv
+.venv*
 graycode_pattern
-capture_*/
+capture_*
+__pycache__
