@@ -49,12 +49,16 @@ def main():
 
     pipeline, align, config = depth.configureDepthCam(frame.shape[1], frame.shape[0], 30)
     auto_depth = True
-    if auto_depth:
-      profile = pipeline.start(config)
-
+    profile = pipeline.start(config)
+    
+    print("Looping until valid depth value")
     cam_depth = depth.getDepth(cam_x, cam_y, pipeline, align)
+    while cam_depth is None:
+      cam_depth = depth.getDepth(cam_x, cam_y, pipeline, align)
+
     if cam_depth is None:
       print("Error obtaining depth through camera")
+      pipeline.stop()
       exit(1)
 
     print(f"Obtained depth: {cam_depth}m")

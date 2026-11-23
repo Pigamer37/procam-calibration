@@ -2,10 +2,10 @@
 python3 gen_graycode_imgs.py 1080 1920
 
 //Take captures
-python3 capture_graycode.py graycode_pattern <number> --camera-index 2 --auto
+python3 capture_graycode.py graycode_pattern <number> <--camera-index 2/--realsense> --auto
 
 //calibrate 2.31 cm
 python3 calibrate.py 1080 1920 10 7 0.0231 1 -camera intel_cam_config.json
 
-//get projector pixel coords from camera pixel coords and depth
-python3 tf_cam2proj.py 960 400 2.5 --camera-index 2 -c calibration_result.xml
+//get projector pixel coords from camera pixel coords and depth (if depth is ommited, depth cam is tried)
+python3 tf_cam2proj.py 960 400 [--cam_depth 2.5] [--camera-index 2] calibration_result.xml

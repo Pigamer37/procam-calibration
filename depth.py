@@ -23,8 +23,8 @@ def configureDepthCam(width:int, height:int, fps:int) -> tuple[rs.pipeline, rs.a
   pipeline = rs.pipeline()
   config = rs.config()
 
-  config.enable_stream(rs.stream.color, width, height, rs.format.bgr8, fps)
-  config.enable_stream(rs.stream.depth, width, height, rs.format.z16, fps)
+  config.enable_stream(rs.stream.color, min(width, 1920), min(height, 1080), rs.format.bgr8, fps)
+  config.enable_stream(rs.stream.depth, min(width, 640), min(height, 480), rs.format.z16, fps)
 
   # Align depth frames to the color stream coordinate space
   align = rs.align(rs.stream.color)
@@ -83,9 +83,6 @@ def getFrames(pipeline:rs.pipeline, align:rs.align) -> tuple[rs.video_frame, rs.
 def getColorImage(pipeline:rs.pipeline, align:rs.align):
   import numpy as np
   color_frame, _ = getFrames(pipeline, align)
-  if not color_frame:
-    return None
-  
   return np.asanyarray(color_frame.get_data())
 
 def getDepth(cam_x:Union[int, float], cam_y:Union[int, float], pipeline:rs.pipeline, align:rs.align) -> Union[None, float]:

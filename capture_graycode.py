@@ -18,6 +18,7 @@ def main():
     parser.add_argument('--camera-index', type=int, default=0,
                         help='OpenCV camera index (default: 0)')
     parser.add_argument('--auto', action='store_true', help='Do capture automatically without waiting for user input')
+    parser.add_argument('--realsense', action='store_true', help='Capture images with a connected realsense camera')
     args = parser.parse_args()
 
     if args.capture_number < 0:
@@ -42,15 +43,19 @@ def main():
     if output_dir.exists():
         parser.error(f'output folder already exists: {output_dir}')
 
-    camera = cv2.VideoCapture(args.camera_index)
-    if not camera.isOpened():
-        camera.release()
-        parser.error(f'could not open camera index {args.camera_index}')
+    if args.realsense:
+        import depth
+        pipeline, align, config = depth.configureDepthCam(1920, 1080, 30)
+        profile = pipeline.start(config)
+    else:
+        camera = cv2.VideoCapture(args.camera_index)
+        if not camera.isOpened():
+            camera.release()
+            parser.error(f'could not open camera index {args.camera_index}')
 
-    camera.set(cv2.CAP_PROP_BUFFERSIZE, 1) #no repeated frames
+        camera.set(cv2.CAP_PROP_BUFFERSIZE, 1) #no repeated frames
 
     try:
-        output_dir.mkdir()
         window_name = 'Gray-code pattern'
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
         cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -58,16 +63,23 @@ def main():
         if init is None:
             print(f'Could not read pattern image: {patterns[0]}', file=sys.stderr)
             return 1
-        
+
         cv2.imshow(window_name, init)
         cv2.waitKey(2000) #wait for window to pop up
-        
+
+        output_dir.mkdir()
+
         while True:
-            ok, frame = camera.read()
-            if not ok:
+            if args.realsense:
+                frame = depth.getColorImage(pipeline, align)
+                ok = frame is not None
+            else:
+                ok, frame = camera.read()
+
+            if not ok or frame is None:
                 print('Could not read a frame from the camera.', file=sys.stderr)
                 return 1
-            
+
             cv2.imshow("Camera feed", frame)
             
             key = cv2.waitKey(100) & 0xFF
@@ -104,14 +116,16 @@ def main():
                         return 0
                     if key in (32, 13):
                         break
-            
-            for _ in range(4):
-                camera.grab()
-
-            # Decode and fetch only the latest frame
-            ok, frame = camera.retrieve()
-            #ok, frame = camera.read()
-            if not ok:
+            if args.realsense:
+                frame = depth.getColorImage(pipeline, align)
+                ok = frame is not None
+            else:
+                for _ in range(4):
+                    camera.grab()
+                # Decode and fetch only the latest frame
+                ok, frame = camera.retrieve()
+                #ok, frame = camera.read()
+            if not ok or frame is None:
                 print('Could not read a frame from the camera.', file=sys.stderr)
                 return 1
 
@@ -123,7 +137,11 @@ def main():
                 return 1
             print(f'Saved {output_path}')
     finally:
-        camera.release()
+        if args.realsense:
+            pipeline.stop()
+        else:
+            camera.release()
+
         cv2.destroyAllWindows()
 
     return 0

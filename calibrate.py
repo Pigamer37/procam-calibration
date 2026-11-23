@@ -181,9 +181,10 @@ def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_siz
             cam_corners2.append(corner)
             # viz_proj_points[int(round(point_pix[1])),
             #                 int(round(point_pix[0]))] = 255
-        if len(proj_corners) < 3:
-            print('Error : too few corners were found in \'' +
-                  dname + '\' (less than 3)')
+        if len(proj_corners) < 4:
+            print('Error : too few projector corners were found in \'' +
+                  dname + '\' (' + str(len(proj_corners)) +
+                  ' found; at least 4 are required)')
             return None
         proj_objps_list.append(np.float32(proj_objps))
         proj_corners_list.append(np.float32(proj_corners))
@@ -206,7 +207,7 @@ def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_siz
             ret, cam_rvec, cam_tvec = cv2.solvePnP(objp, corners, camP, camD) 
             cam_rvecs.append(cam_rvec)
             cam_tvecs.append(cam_tvec)
-            print('  RMS :', ret)
+
         cam_int = camP
         cam_dist = camD
     print('  Intrinsic parameters :')
