@@ -45,7 +45,7 @@ def main():
     args = parser.parse_args()
 
     proj_shape = (args.proj_width, args.proj_height)
-    chess_shape = (args.chess_vert, args.chess_hori)
+    chess_shape = (args.chess_hori, args.chess_vert)
     chess_block_size = args.chess_block_size
     gc_step = args.graycode_step
     black_thr = args.black_thr

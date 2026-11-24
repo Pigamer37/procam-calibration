@@ -71,6 +71,8 @@ python ../calibrate.py 768 1024 9 7 75 1 -black_thr 40 -white_thr 5
 
 `chess_block_size` means the length (mm cm m) of a block on the chessboard.
 The translation vectors will be calculated with the units of length used here.
+The chessboard corner counts are entered vertically first and horizontally second;
+they are converted internally to OpenCV's `(columns, rows)` order.
 
 `black_threashold` is a threashold to determine whether a camera pixel captures projected area or not.
 `white_threashold` is a threashold to specify the robustness of gray code decoding.

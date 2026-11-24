@@ -43,7 +43,7 @@ def getIntrinsics(profile:rs.pipeline_profile):
   return color_intrinsics, depth_intrinsics
 
 def saveIntrinsicsJSON(profile:rs.pipeline_profile, jsonPath:str):
-  _, depth_i = getIntrinsics(profile)
+  color_i, _ = getIntrinsics(profile)
   import json
   from pathlib import Path
   outPath = Path(jsonPath)
@@ -51,13 +51,13 @@ def saveIntrinsicsJSON(profile:rs.pipeline_profile, jsonPath:str):
   result = {
     "camera": {
       "P": [
-        float(depth_i.fx), 0.0, float(depth_i.ppx),
-        0.0, float(depth_i.fy), float(depth_i.ppy),
+        float(color_i.fx), 0.0, float(color_i.ppx),
+        0.0, float(color_i.fy), float(color_i.ppy),
         0.0, 0.0, 1.0,
       ],
-      "distortion": [float(coefficient) for coefficient in depth_i.coeffs],
-      "width": int(depth_i.width),
-      "height": int(depth_i.height),
+      "distortion": [float(coefficient) for coefficient in color_i.coeffs],
+      "width": int(color_i.width),
+      "height": int(color_i.height),
     }
   }
 
@@ -69,7 +69,7 @@ def saveIntrinsicsJSON(profile:rs.pipeline_profile, jsonPath:str):
   except (OSError, ValueError) as error:
     print("Failed writing intrinsics to JSON", error)
     return
-
+  print(f"Distortion model: {color_i.model}")
   print(f"Saved JSON to {outPath}")
 
 def getFrames(pipeline:rs.pipeline, align:rs.align) -> tuple[rs.video_frame, rs.depth_frame]:
